@@ -1,0 +1,4 @@
+.aws-sam
+.idea
+node_modules
+samconfig.toml
