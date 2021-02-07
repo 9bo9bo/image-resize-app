@@ -18,24 +18,25 @@ const Sharp = require('sharp');
  *
  */
 exports.lambdaHandler = async (event, context) => {
-    let response = {};
     let format;
     const bucket = process.env.IMAGE_BUCKET;
     const objectKey = event.path.substring(1);
     const params = event.queryStringParameters || {};
 
-    await S3.getObject({
+    console.log({objectKey, params});
+
+    return await S3.getObject({
         Bucket: bucket,
         Key: objectKey,
     }).promise()
         .then(data => {
             let image = Sharp(data.Body);
 
-            const width = parseInt(params.width);
-            const height = parseInt(params.height);
-            const rotate = parseInt(params.rotate);
-            const x = parseInt(params.x);
-            const y = parseInt(params.y);
+            const width = Number.parseInt(params.width);
+            const height = Number.parseInt(params.height);
+            const rotate = Number.parseInt(params.rotate);
+            const x = Number.parseInt(params.x);
+            const y = Number.parseInt(params.y);
             const fit = params.fit || 'inside';
             format = params.format || data.ContentType.split('/')[1];
 
@@ -45,7 +46,7 @@ exports.lambdaHandler = async (event, context) => {
             }
 
             // extract
-            if (!isNaN(x) && !isNaN(y) && width && height) {
+            if (Number.isInteger(x) && Number.isInteger(y) && width && height) {
                 return image
                     .extract({left: x, top: y, width: width, height: height})
                     .toFormat(format)
@@ -56,7 +57,7 @@ exports.lambdaHandler = async (event, context) => {
             if (width && height) {
                 image = image.resize(width, height, {fit});
             } else if (width) {
-                image = image.resize(width, {fit});
+                image = image.resize(width, null, {fit});
             } else if (height) {
                 image = image.resize(null, height, {fit});
             }
@@ -66,7 +67,7 @@ exports.lambdaHandler = async (event, context) => {
                 .toBuffer();
         })
         .then(buffer => {
-            response = {
+            return {
                 statusCode: 200,
                 headers: {
                     'content-type': `image/${format}`,
@@ -79,13 +80,11 @@ exports.lambdaHandler = async (event, context) => {
         .catch(err => {
             console.log("Exception while reading source image :%j", err);
             if (err.code === 'NoSuchKey') {
-                response = {
+                return {
                     statusCode: 404,
-                }
-                return;
+                    body: JSON.stringify({message: err.message}),
+                };
             }
             throw err;
         });
-
-    return response;
 };
